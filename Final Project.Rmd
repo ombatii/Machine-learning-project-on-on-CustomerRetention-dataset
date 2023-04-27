@@ -1,0 +1,1426 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+# BAN614 Winter 2023: Final Project
+
+A big part of customer relationship management involves efforts to retain existing customers. This is because in many cases the costs incurred to attract new customers are much larger than the costs to retain the existing customers. As part of the class project, your goal is to analyze customer data of a telecommunications company and identify the ones that are likely to leave so that you can take some action to retain them by offering incentives. The dataset contains current customers as well as customers who have left. The description of the dataset is below:
+1. Gender: Male, Female
+2. SeniorCitizen: Whether the customer is a senior citizen or not (1, 0)
+3. Partner: Has a partner (Yes, No)
+4. Dependents: Has dependents (Yes, No)
+5. Tenure: Number of months with the company
+6. PhoneService: Has a phone service (Yes, No)
+7. MultipleLines: Has multiple lines (Yes, No, No phone service)
+8. InternetService: Customer’s Internet Service Provider (DSL, Fiber optic, No)
+9. OnlineSecurity: Customer has online security or not (Yes, No, No internet service)
+10. OnlineBackup: Customer has online backup or not (Yes, No, No internet service)
+11. DeviceProtection: Customer has device protection or not (Yes, No, No internet service)
+12. TechSupport: Customer has tech. support or not (Yes, No, No internet service)
+13. StreamingTV : Customer has streaming TV or not (Yes, No, No internet service)
+14. StreamingMovies: Customer has streaming movies or not (Yes, No, No internet service)
+15. Contract: The contract term of the customer (Month-to-month, One year, Two year)
+16. PaperlessBilling: Customer has paperless billing or not (Yes, No)
+17. PaymentMethod: The customer’s payment method (Electronic check, Mailed check, Bank transfer
+(automatic), Credit card (automatic))
+18. MonthlyCharges: The amount charged to the customer monthly
+19. TotalCharges: The total amount charged to the customer
+20. Status: Current or Left
+
+
+
+
+*A. Scope of Project*
+Organize your report into eight sections as described below:
+*1. Data preparation and Exploratory Data Analysis*
+• Follow concepts learnt in Week 2 to clean the data. If there are missing values then indicate how you plan to work with them.
+## Import libraries going to be used in this project
+```{r}
+library(tidymodels)
+# Load the e1071 package to access Naive Bayes
+library(e1071)
+library(car)
+library(MASS)
+library(caret)
+# Library for tree
+library(tree)
+```
+
+
+
+
+
+## Check missing data
+```{r}
+is.na(CustomerRetention) %>% colSums()
+```
+*OBSERVATION:* The dataset contained missing data TotalCharges column with 11 missing observation.
+
+## Fill the missing data 
+Fills missing values in with median
+```{r}
+meanMissing = median(CustomerRetention$TotalCharges,na.rm =  TRUE)
+CustomerRetention <- CustomerRetention %>% 
+                    mutate(TotalCharges = ifelse(is.na(TotalCharges), meanMissing,                                      TotalCharges))
+                     
+```
+
+## Confirm there are no missing data
+```{r}
+is.na(CustomerRetention) %>% colSums()
+```
+*OBSERVATION:* The dataset contained no missing data.
+
+
+• Explore the dataset and use data visualization to describe underlying trends. You can make observations on the distributions of each variable.
+
+## View of the dataset
+```{r}
+glimpse(CustomerRetention)
+```
+
+*OBSERVATION:* The dataset contains 6,999 observations and 20 coulmns.It contains factor,double and character as datatype.
+
+## Convert status from character to factor
+```{r}
+CustomerRetention <- CustomerRetention %>%
+                     mutate(Status = factor(Status),
+                            SeniorCitizen = factor(SeniorCitizen)) 
+
+glimpse(CustomerRetention)
+```
+
+*OBSERVATION:* The Status column is now a factor
+
+
+## Overwiew of dataset
+```{r}
+skimr::skim(CustomerRetention)
+```
+
+*OBSERVATION:*
+* In datatypes; The dataset contained the columns with the following datatypes;factor  are 16   and numeric are 4.              
+* There were no missing data
+* From the numeric columns none of them contained normal distribution.
+
+
+
+
+
+
+
+• Report your detailed observations of any apparent relationship between customer status and each independent variable.
+*OBSERVATIONS:*
+We get relationship between customer status and each independent variable using scatterplots and barplot. 
+
+##Gender
+```{r}
+ggplot(CustomerRetention, aes(x = Gender, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in both genders.
+
+
+
+## Partner
+```{r}
+ggplot(CustomerRetention, aes(x = Partner, fill =  Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No and Yes.
+
+
+## SeniorCitizen
+```{r}
+ggplot(CustomerRetention, aes(x = SeniorCitizen, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in o and 1 in SeniorCitizen.
+
+## Dependents 
+```{r}
+ggplot(CustomerRetention, aes(x = Dependents, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No and Yes in Dependents.
+
+
+
+
+## Tenure
+```{r}
+ggplot(CustomerRetention, aes(x = Tenure, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+From the barplot conclusion was The frequency of current was fairly much higher in all the values.
+
+
+
+
+## Scatterplot of Tenure against MonthlyCharge
+```{r}
+ggplot(CustomerRetention, aes(y = Tenure,x=MonthlyCharges)) +
+    geom_point(aes(color = factor(Status)))
+```
+
+There is no linear relationship between Tenure and MonthlyCharge nor no trend in the plot.
+
+
+
+## PhoneService
+```{r}
+ggplot(CustomerRetention, aes(x = PhoneService, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No and Yes in PhoneService.
+## MultipleLines
+```{r}
+ggplot(CustomerRetention, aes(x = MultipleLines, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No,No phone service and Yes in MultipleLines.
+
+## InternetService
+```{r}
+ggplot(CustomerRetention, aes(x = InternetService, fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in DSL,Fiber optic and No in internetService.
+
+## OnlineSecurity 
+```{r}
+ggplot(CustomerRetention, aes(x = OnlineSecurity , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No,No internet service and No in OnlineSecurity .
+
+## OnlineBackup 
+```{r}
+ggplot(CustomerRetention, aes(x = OnlineBackup  , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+The frequency of current was much higher in No,No internet service and Yes in OnlineBackup.
+
+## DeviceProtection 
+```{r}
+ggplot(CustomerRetention, aes(x = DeviceProtection  , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No,No internet service and Yes in DeviceProtection.
+
+
+## TechSupport
+```{r}
+ggplot(CustomerRetention, aes(x = TechSupport , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+The frequency of current was much higher in No,No internet service and Yes in TechSupport.
+
+
+
+## StreamingTV 
+```{r}
+ggplot(CustomerRetention, aes(x = StreamingTV  , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+The frequency of current was much higher in No,No  internet service and Yes in StreamingTV.
+
+## StreamingMovies 
+```{r}
+ggplot(CustomerRetention, aes(x = StreamingMovies  , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No,No internet service and Yes in StreamingMovies.
+
+
+## Contract
+```{r}
+ggplot(CustomerRetention, aes(x = Contract , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in Month-to-month,One year and Two year in  Contract.
+
+
+## PaperlessBilling
+```{r}
+ggplot(CustomerRetention, aes(x = PaperlessBilling , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in No and Yes in  PaperlessBilling.
+
+##  PaymentMethod
+```{r}
+ggplot(CustomerRetention, aes(x =  PaymentMethod , fill = Status)) +
+    geom_bar(position = position_dodge()) +
+    theme_classic()
+```
+
+The frequency of current was much higher in Electronic check,Mailed check,Bank Transer and Credit card in  PaymentMethod.
+
+
+• Create any new columns if you need to at this point.
+• Once you are done with the above, split the data set randomly into a training set (80%) and a test set
+(20%).
+##  split the data set randomly into a training set (80%) and a test set (20%)
+```{r}
+# Set seed for reproducibility of analysis
+set.seed(21)
+
+# Create a vector of random numbers to select the row numbers that we will use as training observations
+train <- sample(1:6999,  5600)
+
+# Create the test set
+df.train <- CustomerRetention[train,]
+
+# Create the test set
+df.test <- CustomerRetention[-train,]
+```
+
+
+
+
+
+2. Logistic Regression
+• Use the training set to build a Logistic Regression model to predict the probability for losing a customer.
+
+```{r}
+# Store the Logistic Regression model in LogisticModel
+LogisticModel.train <- glm(Status ~ ., data = df.train, family = binomial)
+
+# Create the summary of the Logistic Regression Model
+summary(LogisticModel.train)
+```
+
+*OBSERVATION:* The performance of our logistic regression is evaluated with specific key metrics;
+
+1. *AIC (Akaike Information Criteria):* It measures the fit when a penalty is applied to the number of parameters. Smaller AIC values indicate the model is closer to the truth.Our model had a value of 4721.6
+2. *Null deviance:* We can interpret it as a Chi-square value (fitted value different from the actual value hypothesis testing).Our model had a value of 6528.5  on 5599  degrees of freedom
+3. *Residual Deviance:* It is interpreted as a Chi-square hypothesis testing.Our model had a value of 4673.6  on 5576 degrees of freedom
+4.*Number of Fisher Scoring iterations:* Number of iterations before converging.Our model had a value of 6
+
+
+
+
+
+
+## Make predictions
+```{r}
+
+# suppress the warnings by setting warn=-1
+options(warn=-1)
+ 
+Predictions_Probabilities <- predict(LogisticModel.train, type = "response", newdata = df.test)
+
+# Create a vector of prediction classes based on the value of the prediction probability
+Prediction_Classes <- ifelse(Predictions_Probabilities > 0.5, "Current", "Left")
+
+# Use the table function and use the prediction classes and the actual classes as the inputs
+table(Prediction_Classes, df.test$Status)
+
+```
+
+## Plotting ROC
+```{r}
+
+# suppress the warnings by setting warn=-1
+options(warn=-1)
+ 
+library(pROC)
+
+#define object to plot and calculate AUC
+rocobj <- roc(df.test$Status,Predictions_Probabilities)
+auc <- round(auc(df.test$Status,Predictions_Probabilities),4)
+
+#create ROC plot
+ggroc(rocobj, colour = 'steelblue', size = 2) +
+  ggtitle(paste0('ROC Curve ', '(AUC = ', auc, ')'))
+
+
+
+```
+
+*OBSERVATION:* The AUC is 0.8492
+
+• Try different combinations of variables and arrive at the model that maximizes AUC (Area Under the Curve) for the ROC plots.
+
+*Observations:* The best model was *LogisticModel.train_2* 
+
+  
+## Model with these as predictor variable;
+## Gender , SeniorCitizen , Partner , Dependents , Tenure , PhoneService , MultipleLines , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , Contract , PaperlessBilling , PaymentMethod , MonthlyCharges , TotalCharges
+
+
+```{r}
+# Store the Logistic Regression model in LogisticModel.train_2
+LogisticModel.train_2 <- glm(Status ~ Gender + SeniorCitizen + Partner + Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod, data = df.train, family = binomial)
+
+# Create the summary of the LogisticModel.train_2
+#summary(LogisticModel.train_2)
+
+# Making predictions using the model generated earlier.
+
+Predictions_Probabilities_2 <- predict(LogisticModel.train_2, type = "response", newdata = df.test)
+
+# Create a vector of prediction classes based on the value of the prediction probability
+Prediction_Classes_2 <- ifelse(Predictions_Probabilities_2 > 0.5, "Current", "Left")
+
+# Use the table function and use the prediction classes and the actual classes as the inputs
+table_3 <- table(Prediction_Classes_2, df.test$Status)
+suppressWarnings(table_3)
+#table_3
+
+# Plotting the ROC
+#define object to plot and calculate AUC
+
+# suppress the warnings by setting warn=-1
+options(warn=-1)
+ 
+rocobj <- roc(df.test$Status,Predictions_Probabilities_2)
+auc <- round(auc(df.test$Status,Predictions_Probabilities_2),4)
+
+#create ROC plot
+ggroc(rocobj, colour = 'steelblue', size = 2) +
+  ggtitle(paste0('ROC Curve ', '(AUC = ', auc, ')'))
+
+
+```
+*OBSERVATION:* The AUC is 0.8495
+
+## accuracy(%)
+```{r}
+accuracy.glm.0.5 <- ((109 + 161)/(109 + 185 + 944 + 161) * 100)
+accuracy.glm.0.5
+```
+
+
+
+
+## Model with these as predictor variable;
+## Gender , SeniorCitizen , Partner , Dependents , Tenure , PhoneService , MultipleLines , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , Contract , PaperlessBilling , PaymentMethod
+```{r}
+# Store the Logistic Regression model in LogisticModel.train_3
+LogisticModel.train_3 <- glm(Status ~ Gender + SeniorCitizen + Partner + Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + Contract + PaperlessBilling + PaymentMethod, data = df.train, family = binomial)
+
+# Create the summary of the Logistic Regression Model
+#summary(LogisticModel.train_3)
+
+# Making predictions using the model generated earlier.
+
+Predictions_Probabilities_3 <- predict(LogisticModel.train_3, type = "response", newdata = df.test)
+
+# Create a vector of prediction classes based on the value of the prediction probability
+Prediction_Classes_3 <- ifelse(Predictions_Probabilities_3 > 0.5, "Current", "Left")
+
+# Use the table function and use the prediction classes and the actual classes as the inputs
+table(Prediction_Classes_3, df.test$Status)
+
+
+# Plotting the ROC
+#define object to plot and calculate AUC
+
+rocobj <- roc(df.test$Status,Predictions_Probabilities_3)
+auc <- round(auc(df.test$Status,Predictions_Probabilities_3),4)
+
+#create ROC plot
+ggroc(rocobj, colour = 'steelblue', size = 2) +
+  ggtitle(paste0('ROC Curve ', '(AUC = ', auc, ')'))
+
+```
+*OBSERVATION:* The AUC is 0.8444
+
+
+
+
+• For the model with the highest AUC, interpret each coefficient and provide guidance to the reader on how varying the different variables will influence customer behavior.
+
+
+## The training model that had all the variables as predictors
+```{r}
+summary(LogisticModel.train)
+```
+
+*OBSERVATION;* The performance of our logistic regression is evaluated with specific key metrics;
+
+* AIC (Akaike Information Criteria): It measures the fit when a penalty is applied to the       number of parameters. Smaller AIC values indicate the model is closer to the truth.Our model   had a value of 4721.6
+* Null deviance: We can interpret it as a Chi-square value (fitted value different from the     actual value hypothesis testing).Our model had a value of 6528.5  on 5599 degrees of freedom
+* Residual Deviance: It is interpreted as a Chi-square hypothesis testing.Our model had a       value of 4673.6  on 5576 degrees of freedom
+* Number of Fisher Scoring iterations: Number of iterations before converging.Our model had a   value of 6
+
+
+
+
+
+• Try different thresholds to identify the C with the highest prediction accuracy on the test set.
+*Observations:* The LogisticModel.train_2 was used and highest accuracy was produced by this Thresholds; Thresholds is 0.9
+## Thresholds is 0.3
+```{r}
+# Create a vector of prediction classes based on the value of the prediction probability
+Prediction_Classes_0.3 <- ifelse(Predictions_Probabilities_2 > 0.3, "Current", "Left")
+
+# Use the table function and use the prediction classes and the actual classes as the inputs
+table(Prediction_Classes_0.3, df.test$Status)
+
+```
+### Accuracy(%)
+```{r}
+accuracy.glm.0.3 <- (232+ 79)/(232 +267+821+79)*100
+accuracy.glm.0.3
+```
+
+
+
+
+
+
+
+## Thresholds is 0.6
+```{r}
+# Create a vector of prediction classes based on the value of the prediction probability
+Prediction_Classes_0.6 <- ifelse(Predictions_Probabilities_2> 0.6, "Current", "Left")
+
+# Use the table function and use the prediction classes and the actual classes as the inputs
+table(Prediction_Classes_0.6, df.test$Status)
+
+```
+### Accuracy(%)
+```{r}
+accuracy.glm.0.6 <- (67+205)/(67+141+986+205)*100
+accuracy.glm.0.6
+```
+
+
+
+## Thresholds is 0.9
+```{r}
+# Create a vector of prediction classes based on the value of the prediction probability
+Prediction_Classes_0.9 <- ifelse(Predictions_Probabilities_2 > 0.9, "Current", "Left")
+
+# Use the table function and use the prediction classes and the actual classes as the inputs
+table(Prediction_Classes_0.9, df.test$Status)
+
+```
+### Accuracy(%)
+```{r}
+accuracy.glm.0.9 <- 0/(1053+346)*100
+accuracy.glm.0.9
+```
+
+
+
+
+
+
+3. Naive Bayes
+• Use the training set to build a Naive Bayes model to predict the probability for losing a customer.
+
+## Create the Naive Bayes Classifier
+```{r}
+# Store the Naive Bayes Classifier model in NaiveBayes.train
+NaiveBayes.train <- naiveBayes(Status ~ Gender + SeniorCitizen + Partner + Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + MonthlyCharges + TotalCharges
+,df.train,laplace = 0.01)
+
+# Create the summary of the Logistic Regression Model
+summary(NaiveBayes.train)
+```
+## Making predictions
+```{r}
+Predictions <- predict(NaiveBayes.train,newdata = df.test)
+```
+
+## Obtain the posterior probabilities and then assign the class based on the cutoff we want(0.5)
+```{r}
+predictions.test.prob <- predict(NaiveBayes.train, newdata = df.test, type = "raw")
+head(predictions.test.prob)
+```
+
+### Threshold of 0.5
+```{r}
+# Extract the second column of the array and store
+predictions.test.Left.prob <- predictions.test.prob[,2]
+# Now you can set your own cutoff and assign the class. Here I am using 0.4
+predictions.test.class0.5 <- ifelse(predictions.test.Left.prob > 0.5, "Left", "Current")
+```
+
+## Create the confusion matrix
+```{r}
+table(predictions.test.class0.5, df.test$Status)
+```
+## Accuracy(%)
+```{r}
+accuracy.nb.0.5 <- (746 + 276)/(746 + 70 + 307 + 276) * 100
+accuracy.nb.0.5
+```
+
+
+
+
+
+## Plotting ROc 
+```{r}
+
+# suppress the warnings by setting warn=-1
+options(warn=-1)
+ 
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within double braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left <- predictions.test.Left.prob
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds <- data.frame(Probability_Left)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds <- Default_thresholds %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Current","Left")))
+
+str(Default_thresholds)
+
+## Ploting the ROC
+roc(Default_thresholds$Actual_defaults,Default_thresholds$Probability_Left,plot=TRUE,print.auc=TRUE)
+```
+
+
+
+
+• Try different combinations of variables and arrive at the model that maximizes AUC (Area Under the Curve) for the ROC plots.
+
+*Observations:* The best model was *NaiveBayes.train* 
+
+
+## Model with these as predictor variable;
+## Gender , SeniorCitizen , Partner , Dependents , Tenure , PhoneService , MultipleLines , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , Contract , PaperlessBilling , PaymentMethod 
+```{r}
+# Create the Naive Bayes Classifier
+# Store the Naive Bayes Classifier model in NaiveBayes.train_2 
+NaiveBayes.train_2 <- naiveBayes(Status ~ Gender + SeniorCitizen + Partner + Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod 
+,df.train,laplace = 0.01)
+
+# Create the summary of the Logistic Regression Model
+summary(NaiveBayes.train_2)
+
+## Obtain the posterior probabilities and then assign the class based on the cutoff we want(0.5)
+
+predictions.test.prob_2 <- predict(NaiveBayes.train_2, newdata = df.test, type = "raw")
+head(predictions.test.prob_2)
+
+# Extract the second column of the array and store
+predictions.test.Left.prob_2 <- predictions.test.prob_2[,2]
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left_2 <- predictions.test.Left.prob_2
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds_2 <- data.frame(Probability_Left_2)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds_2 <- Default_thresholds_2 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Current","Left")))
+
+str(Default_thresholds_2)
+
+## Ploting the ROC
+roc(Default_thresholds$Actual_defaults,Default_thresholds_2$Probability_Left,plot=TRUE,print.auc=TRUE)
+```
+
+
+## Model with these as predictor variable;
+## Gender , SeniorCitizen  , Tenure , PhoneService , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , Contract , PaperlessBilling , PaymentMethod , PaymentMethod , MonthlyCharges , TotalCharges
+```{r}
+# Create the Naive Bayes Classifier
+# Store the Naive Bayes Classifier model in NaiveBayes.train_3
+NaiveBayes.train_3 <- naiveBayes(Status ~ Gender + SeniorCitizen  + Tenure + PhoneService + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + PaymentMethod + MonthlyCharges + TotalCharges, df.train,laplace = 0.01)
+
+# Create the summary of the Logistic Regression Model
+summary(NaiveBayes.train_3)
+
+## Obtain the posterior probabilities and then assign the class based on the cutoff we want(0.5)
+
+predictions.test.prob_3 <- predict(NaiveBayes.train_3, newdata = df.test, type = "raw")
+head(predictions.test.prob_3)
+
+# Extract the second column of the array and store
+predictions.test.Left.prob_3 <- predictions.test.prob_3[,2]
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left_3 <- predictions.test.Left.prob_3
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds_3 <- data.frame(Probability_Left_3)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds_3 <- Default_thresholds_3 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left> 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Current","Left")))
+
+str(Default_thresholds_3)
+
+## Ploting the ROC
+roc(Default_thresholds$Actual_defaults,Default_thresholds_3$Probability_Left,plot=TRUE,print.auc=TRUE)
+```
+
+
+## Model with these as predictor variable;
+## Dependents , Tenure , PhoneService , MultipleLines , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , Contract , PaperlessBilling , PaymentMethod , MonthlyCharges , TotalCharge
+```{r}
+# Create the Naive Bayes Classifier
+# Store the Naive Bayes Classifier model in NaiveBayes.train_4
+NaiveBayes.train_4 <- naiveBayes(Status ~ Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + MonthlyCharges + TotalCharges, df.train,laplace = 0.01)
+
+# Create the summary of the Logistic Regression Model
+summary(NaiveBayes.train_4)
+
+## Obtain the posterior probabilities and then assign the class based on the cutoff we want(0.5)
+
+predictions.test.prob_4 <- predict(NaiveBayes.train_4, newdata = df.test, type = "raw")
+head(predictions.test.prob_4)
+
+# Extract the second column of the array and store
+predictions.test.Left.prob_4 <- predictions.test.prob_4[,2]
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left_4 <- predictions.test.Left.prob_4
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds_4 <- data.frame(Probability_Left_4)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 20%. If the posterior is > 0.2 then we assign a "Left" , else "Current".
+
+Default_thresholds_4 <- Default_thresholds_4 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Current","Left")))
+
+str(Default_thresholds_4)
+
+## Ploting the ROC
+roc(Default_thresholds$Actual_defaults,Default_thresholds_4$Probability_Left,plot=TRUE,print.auc=TRUE)
+```
+
+*OBSERVATION:*The AUC is 0.826
+
+• For the model with the highest AUC, try different thresholds to identify the threshold with the highest prediction accuracy on the test set.
+
+*Observations:* The NaiveBayes.train was used and highest accuracy was produced by this Thresholds; Thresholds is 0.9
+
+# Threshold of 0.3
+```{r}
+# Extract the second column of the array and store
+predictions.test.Left.prob <- predictions.test.prob[,2]
+# Now you can set your own cutoff and assign the class. Here I am using 0.4
+predictions.test.class0.3 <- ifelse(predictions.test.Left.prob > 0.3, "Left", "Current")
+```
+
+## Create the confusion matrix
+```{r}
+table(predictions.test.class0.3, df.test$Status)
+```
+
+## Accuracy(%)
+```{r}
+accuracy.nb.0.3 <- (702+290)/(702+290+351+290)*100
+accuracy.nb.0.3
+```
+
+# Threshold of 0.6
+```{r}
+# Extract the second column of the array and store
+predictions.test.Left.prob <- predictions.test.prob[,2]
+# Now you can set your own cutoff and assign the class. Here I am using 0.4
+predictions.test.class0.6 <- ifelse(predictions.test.Left.prob > 0.6, "Left", "Current")
+```
+
+## Create the confusion matrix
+```{r}
+table(predictions.test.class0.6, df.test$Status)
+```
+
+## Accuracy(%)
+```{r}
+accuracy.nb.0.6 <- (768+274)/(768+72+285+274)*100
+accuracy.nb.0.6
+```
+
+
+
+### Threshold of 0.9
+```{r}
+# Extract the second column of the array and store
+predictions.test.Left.prob <- predictions.test.prob[,2]
+# Now you can set your own cutoff and assign the class. Here I am using 0.4
+predictions.test.class0.9 <- ifelse(predictions.test.Left.prob > 0.9, "Left", "Current")
+```
+
+## Create the confusion matrix
+```{r}
+table(predictions.test.class0.9, df.test$Status)
+```
+## Accuracy(%)
+```{r}
+accuracy.nb.0.9 <- (871+231)/(871+231+182+115)*100
+accuracy.nb.0.9
+```
+
+4. Linear Discriminant Analysis
+• Use the training set to build a model using Linear Discriminant Analysis to predict the probability for losing a customer.
+
+## Defining the model
+```{r}
+Default_lda <- lda(Status ~ Gender + SeniorCitizen + Partner + Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + MonthlyCharges + TotalCharges, data = df.train)
+
+
+Default_lda
+```
+## Confusion matrix
+
+### Making predictions
+```{r}
+Default_pred <- predict(Default_lda,df.test)
+head(Default_pred$posterior)
+```
+
+### Make confusion matrix
+```{r}
+Default_conf_matrix <- confusionMatrix(Default_pred$class, df.test$Status, positive = "Left")
+Default_conf_matrix 
+```
+*OBSERVATION:* The accuracy is 0.8084 
+## accuracy(%)
+```{r}
+accuracy.lda.0.5 <- 0.8084 * 100
+accuracy.lda.0.5
+```
+
+
+
+## Plot ROC baesd on threshold of 0.5
+```{r}
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left <- Default_pred[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds <- data.frame(Probability_Left)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds <- Default_thresholds %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_thresholds$Probability_Left,plot=TRUE,print.auc=TRUE)
+```
+
+
+
+• Try different combinations of variables and arrive at the model that maximizes AUC (Area Under the Curve) for the ROC plots.
+
+*Observations:* The best model was *Default_lda* 
+## Model with these as predictor variable;
+## Dependents , Tenure , PhoneService , MultipleLines , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , Contract , PaperlessBilling , PaymentMethod , MonthlyCharges , TotalCharges 
+```{r}
+## Defining the model
+Default_lda2 <- lda(Status ~ Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling + PaymentMethod + MonthlyCharges + TotalCharges, data = df.train)
+Default_lda
+## Confusion matrix
+### Making predictions
+
+Default_pred2 <- predict(Default_lda2,df.test)
+head(Default_pred2$posterior)
+
+### Make confusion matrix
+Default_conf_matrix2 <- confusionMatrix(Default_pred2$class, df.test$Status, positive = "Left")
+Default_conf_matrix2 
+## Plot ROC baesd on threshold of 0.5
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left2 <- Default_pred2[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds2 <- data.frame(Probability_Left2)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds2 <- Default_thresholds2 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left2 > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_thresholds2$Probability_Left2,plot=TRUE,print.auc=TRUE)
+```
+*OBSERVATION:*The AUC is 0.826
+
+## Model with these as predictor variable;
+
+## Gender , SeniorCitizen , Partner , Dependents , Tenure , PhoneService , MultipleLines , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , Contract , PaperlessBilling
+```{r}
+## Defining the model
+Default_lda3 <- lda(Status ~ Gender + SeniorCitizen + Partner + Dependents + Tenure + PhoneService + MultipleLines + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + Contract + PaperlessBilling  , data = df.train)
+Default_lda3
+## Confusion matrix
+### Making predictions
+
+Default_pred3 <- predict(Default_lda3,df.test)
+head(Default_pred3$posterior)
+
+### Make confusion matrix
+Default_conf_matrix3 <- confusionMatrix(Default_pred3$class, df.test$Status, positive = "Left")
+Default_conf_matrix3 
+## Plot ROC baesd on threshold of 0.5
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left3 <- Default_pred3[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds3 <- data.frame(Probability_Left3)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds3 <- Default_thresholds3 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left3 > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_thresholds3$Probability_Left3,plot=TRUE,print.auc=TRUE)
+```
+*OBSERVATION:*The AUC is 0.826
+
+## Model with these as predictor variable;
+## Gender , SeniorCitizen , Partner , Dependents , PhoneService , MultipleLines , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , StreamingTV , StreamingMovies , PaymentMethod , MonthlyCharges , TotalCharges
+```{r}
+## Defining the model
+Default_lda4 <- lda(Status ~ Gender + SeniorCitizen + Partner + Dependents + PhoneService + MultipleLines + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + StreamingTV + StreamingMovies + PaymentMethod + MonthlyCharges + TotalCharges, data = df.train)
+Default_lda
+## Confusion matrix
+### Making predictions
+
+Default_pred4 <- predict(Default_lda4,df.test)
+head(Default_pred4$posterior)
+
+### Make confusion matrix
+Default_conf_matrix4 <- confusionMatrix(Default_pred4$class, df.test$Status, positive = "Left")
+Default_conf_matrix4 
+## Plot ROC baesd on threshold of 0.5
+
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left4 <- Default_pred4[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds4 <- data.frame(Probability_Left4)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds4 <- Default_thresholds4 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_Left4 > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_thresholds4$Probability_Left4,plot=TRUE,print.auc=TRUE)
+```
+*OBSERVATION:*The AUC is 0.834
+
+• For the model with the highest AUC, try different thresholds to identify the threshold with the highest prediction accuracy on the test set.
+## Plot ROC baesd on threshold of 0.3
+```{r}
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_Left <- Default_pred[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_thresholds <- data.frame(Probability_Left)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_thresholds <- Default_thresholds %>% 
+  mutate(Class_th_0.3 = ifelse(Probability_Left > 0.3, "Left", "Current"), Class_th_0.3 = factor(Class_th_0.3, levels=c("Left", "Current")))
+
+confusionMatrix(Default_thresholds$Class_th_0.3, Default_thresholds$Actual_defaults, positive = "Left")
+```
+## Accuracy(%)
+```{r}
+accuracy.lda.0.3 <- 0.7891 * 100
+accuracy.lda.0.3
+```
+
+
+
+
+## Thrershold of 0.6
+```{r}
+Default_thresholds <- Default_thresholds %>% 
+  mutate(Class_th_0.6 = ifelse(Probability_Left > 0.6, "Left", "Current"), Class_th_0.6 = factor(Class_th_0.6, levels=c("Left", "Current")))
+
+confusionMatrix(Default_thresholds$Class_th_0.6, Default_thresholds$Actual_defaults, positive = "Left")
+```
+
+## Accuracy(%)
+```{r}
+accuracy.lda.0.6 <- 0.8142 * 100
+accuracy.lda.0.6  
+```
+
+## Thrershold of 0.9
+```{r}
+Default_thresholds <- Default_thresholds %>% 
+  mutate(Class_th_0.9 = ifelse(Probability_Left > 0.9, "Left", "Current"), Class_th_0.9 = factor(Class_th_0.9, levels=c("Left", "Current")))
+
+confusionMatrix(Default_thresholds$Class_th_0.9, Default_thresholds$Actual_defaults, positive = "Left")
+```
+## Accuracy(%)
+```{r}
+accuracy.lda.0.9 <-  0.7534 * 100
+accuracy.lda.0.9
+```
+
+
+
+5. Quadratic Discriminant Analysis
+• Use the training set to build a model using Quadratic Discriminant Analysis to predict the probability for losing a customer.
+## Model containing this variables;
+## Tenure,MonthlyCharges,TotalCharges + Contract + Gender,SeniorCitizen+ Partner + Dependents + PhoneService  
+```{r}
+Default_qda <- qda(Status ~ Tenure+MonthlyCharges+TotalCharges + Contract + Gender+SeniorCitizen+ Partner + Dependents + PhoneService                      , data = df.train)
+Default_qda
+```
+
+
+## Confusion matrix
+
+### Making predictions
+```{r}
+Default_qda_pred <- predict(Default_qda,df.test)
+head(Default_qda_pred$posterior)
+```
+
+### Make confusion matrix
+```{r}
+Default_qda_conf_matrix <- confusionMatrix(Default_qda_pred$class, df.test$Status, positive = "Left")
+Default_qda_conf_matrix 
+```
+## Accuracy(%)
+```{r}
+accuracy.qda.0.5 <-  0.7248  * 100
+accuracy.qda.0.5  
+```
+
+
+
+
+
+## Plot ROC baesd on threshold of 0.5
+```{r}
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_qda_Left <- Default_qda_pred[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_qda_thresholds <- data.frame(Probability_qda_Left)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_qda_thresholds <- Default_qda_thresholds %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_qda_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_qda_thresholds$Probability_qda_Left,plot=TRUE,print.auc=TRUE)
+```
+
+*OBSERVATION:*The AUC is 0.831
+
+• Try different combinations of variables and arrive at the model that maximizes AUC (Area Under the Curve) for the ROC plots.
+*Observations:* The best model was *Default_qda*
+
+## The model contain this variables;
+## Tenure,MonthlyCharges,TotalCharge  
+
+```{r}
+## Creating the model
+Default_qda2 <- qda(Status ~ Tenure +MonthlyCharges+TotalCharges + Dependents + PhoneService , data = df.train)
+Default_qda2
+
+
+## Confusion matrix
+
+### Making predictions
+Default_qda_pred2 <- predict(Default_qda2,df.test)
+head(Default_qda_pred2$posterior)
+
+
+## Plot ROC baesd on threshold of 0.5
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_qda_Left2 <- Default_qda_pred2[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_qda_thresholds2 <- data.frame(Probability_qda_Left2)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_qda_thresholds2 <- Default_qda_thresholds2 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_qda_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_qda_thresholds2$Probability_qda_Left2,plot=TRUE,print.auc=TRUE)
+
+```
+## Model with these column as predictor variables;
+## Tenure,MonthlyCharges,TotalCharge  
+
+```{r}
+## Creating the model
+Default_qda3 <- qda(Status ~ Tenure+MonthlyCharges+TotalCharges , data = df.train)
+Default_qda3
+
+
+## Confusion matrix
+
+### Making predictions
+Default_qda_pred3 <- predict(Default_qda3,df.test)
+head(Default_qda_pred3$posterior)
+
+
+## Plot ROC baesd on threshold of 0.5
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_qda_Left3 <- Default_qda_pred3[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_qda_thresholds3 <- data.frame(Probability_qda_Left3)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 50%. If the posterior is > 0.5 then we assign a "Left" , else "Current".
+
+Default_qda_thresholds3 <- Default_qda_thresholds3 %>% 
+  mutate(Class_th_0.5 = ifelse(Probability_qda_Left > 0.5, "Left", "Current"), Class_th_0.5 = factor(Class_th_0.5, levels=c("Left", "Current")))
+
+roc(Default_thresholds$Actual_defaults,Default_qda_thresholds3$Probability_qda_Left3,plot=TRUE,print.auc=TRUE)
+
+```
+
+*OBSERVATIONS:* The AUC is 0.798
+
+• For the model with the highest AUC, try different thresholds to identify the threshold with the highest prediction accuracy on the test set.
+
+*Observations:* The Default_qda was used and highest accuracy was produced by this Thresholds; Thresholds is 0.9
+
+
+
+
+## Plot ROC baesd on threshold of 0.3
+```{r}
+# We can do it by accessing the list object *Default_pred*. We first use the name *posterior* within bouble braces to access the matrix and then refer to the second column of the matrix using the square brackets. 
+
+Probability_qda_Left <- Default_qda_pred[["posterior"]][,2]
+
+# * We then save it as a dataframe and then also add the actual default values from the original dataset.
+
+Default_qda_thresholds <- data.frame(Probability_qda_Left)
+Default_thresholds$Actual_defaults <- df.test$Status
+
+# We now add another column and assign classes based on the threshold of 30%. If the posterior is > 0.3then we assign a "Left" , else "Current".
+
+Default_qda_thresholds <- Default_qda_thresholds %>% 
+  mutate(Class_th_0.3 = ifelse(Probability_qda_Left > 0.3,"Left", "Current"), Class_th_0.3 = factor(Class_th_0.3, levels=c("Left", "Current")))
+
+confusionMatrix(Default_thresholds$Class_th_0.3, Default_thresholds$Actual_defaults, positive = "Left")
+```
+## Accuracy(%)
+```{r}
+accuracy.qda.0.3 <- 0.7891 * 100
+accuracy.qda.0.3
+```
+
+
+
+
+
+
+
+
+## Thrershold of 0.6
+```{r}
+Default_qda_thresholds <- Default_qda_thresholds %>% 
+  mutate(Class_th_0.6 = ifelse(Probability_Left > 0.6, "Left", "Current"), Class_th_0.6 = factor(Class_th_0.6, levels=c("Left", "Current")))
+
+confusionMatrix(Default_thresholds$Class_th_0.6, Default_thresholds$Actual_defaults, positive = "Left")
+```
+## Accuracy(%)
+```{r}
+accuracy.qda.0.6 <- 0.8142  * 100
+accuracy.qda.0.6
+```
+
+
+## Thrershold of 0.9
+```{r}
+Default_qda_thresholds <- Default_qda_thresholds %>% 
+  mutate(Class_th_0.9 = ifelse(Probability_Left > 0.9, "Left", "Current"), Class_th_0.9 = factor(Class_th_0.9, levels=c("Left", "Current")))
+
+confusionMatrix(Default_thresholds$Class_th_0.9,Default_thresholds$Actual_defaults, positive = "Left")
+```
+## Accuracy(%)
+```{r}
+accuracy.qda.0.9 <- 0.7534 * 100
+accuracy.qda.0.9
+```
+
+
+
+
+
+6. Decision Trees
+• Use the training set to build a Decision Tree model to predict the probability for losing a customer.
+
+## Fit a classification tree
+```{r}
+# Create a vector with the actual classifications from the test set
+High.test <- df.test$Status
+
+
+tree.CR <- tree(Status ~ ., df.train)
+
+# Use the tree created above and make predictions using the test data. The argument *type = "class"* instructs R to return the actual class prediction. 
+tree.pred.test <- predict(tree.CR, df.test, type = "class")
+
+# The output from the above code will be a vector of predictions
+str(tree.pred.test)
+
+# Create the confusion matrix using the predictions vector along with the actual classification present in the test data
+table(tree.pred.test, High.test)
+```
+
+## Accuracy(%)
+```{r}
+accuracy.ct.0.5.a <- (983+137)/(983+137+70+209) * 100
+accuracy.ct.0.5.a 
+```
+
+• Try different combinations of variables and identify the model with the largest prediction accuracy.
+
+*Observations:* The best model was *tree.CR*
+## Fit a classification tree
+## Model with this predictor variables;
+### Gender , SeniorCitizen , Partner
+```{r}
+# Create a vector with the actual classifications from the test set
+High.test <- df.test$Status
+
+
+tree.CR2 <- tree(Status ~ Gender + SeniorCitizen , df.train)
+
+# Use the tree created above and make predictions using the test data. The argument *type = "class"* instructs R to return the actual class prediction. 
+tree.pred.test2 <- predict(tree.CR2, df.test, type = "class")
+
+# The output from the above code will be a vector of predictions
+str(tree.pred.test2)
+
+# Create the confusion matrix using the predictions vector along with the actual classification present in the test data
+table(tree.pred.test2, High.test)
+```
+
+## Model with these column as predictor variables;
+### Gender , SeniorCitizen , InternetService , OnlineSecurity , OnlineBackup , DeviceProtection , TechSupport , Contract , PaperlessBilling
+```{r}
+# Create a vector with the actual classifications from the test set
+High.test <- df.test$Status
+
+
+tree.CR2 <- tree(Status ~ Gender + SeniorCitizen + InternetService + OnlineSecurity + OnlineBackup + DeviceProtection + TechSupport + Contract + PaperlessBilling , df.train)
+
+# Use the tree created above and make predictions using the test data. The argument *type = "class"* instructs R to return the actual class prediction. 
+tree.pred.test2 <- predict(tree.CR2, df.test, type = "class")
+
+# The output from the above code will be a vector of predictions
+str(tree.pred.test2)
+
+# Create the confusion matrix using the predictions vector along with the actual classification present in the test data
+table(tree.pred.test2, High.test)
+```
+
+## Accuracy(%)
+```{r}
+accuracy.ct.0.5.b <- (864+221)/(864+221+189+125) * 100
+accuracy.ct.0.5.b
+```
+
+
+
+
+
+
+
+7. Comparison across Methods
+• Compare across methods (skip the model built with decision trees) used above and report your best method based on ROC plots.
+
+*OBSERVATION:* From the ROC plots,this are the best models from various model type used with threshold= 0.5 ,and their accuracy
+## Create models and accuracy.Model
+```{r}
+
+models <- c("Logistic Regression","Naive Bayes","Linear Discriminant Analysis","Quadratic Discriminant Analysis")
+accuracy.Model <- c(0.8495,0.828,0.847,0.831)
+# Join the variables to create a data frame
+table <- data.frame(models,accuracy.Model)
+table
+```
+```{r}
+tib <- as_tibble(table)
+tib
+```
+
+
+
+
+• Which model does the best in terms of the prediction accuracy on the test set? Include the decision tree model here.
+*OBSERVATION:*
+This is two the models performed with various thresholds,for the classification i used different models
+## Dataframe with the observations
+```{r}
+models_2 <- c("Logistic Regression(0.3)","Logistic Regression(0.5)","Logistic Regression(0.6)","Logistic Regression(0.9)","Naive Bayes(0.3)","Naive Bayes(0.5)","Naive Bayes(0.6)","Naive Bayes(0.9)","Linear Discriminant Analysis(0.3)","Linear Discriminant Analysis(0.5)","Linear Discriminant Analysis(0.6)","Linear Discriminant Analysis(0.9)","Quadratic Discriminant Analysis(0.3)","Quadratic Discriminant Analysis(0.5)","Quadratic Discriminant Analysis(0.6)","Quadratic Discriminant Analysis(0.9)","Decision Trees(a)","Decision Trees(b)")
+
+accuracy_2 <- c(accuracy.glm.0.3,accuracy.glm.0.5,accuracy.glm.0.6,accuracy.glm.0.9,accuracy.nb.0.3,accuracy.nb.0.5,accuracy.nb.0.6,accuracy.nb.0.9,accuracy.lda.0.3,accuracy.lda.0.5,accuracy.lda.0.6,accuracy.lda.0.9,accuracy.qda.0.3,accuracy.qda.0.5,accuracy.qda.0.6,accuracy.qda.0.9,accuracy.ct.0.5.a,accuracy.ct.0.5.b)
+
+# Join the variables to create a data frame
+table_2 <- data.frame(models_2 ,accuracy_2)
+table_2
+
+```
+
+These are the best models;Linear Discriminant Analysis(0.6) and Linear Discriminant Analysis(0.6) with threshold = 0.6 with accuracy of 81.42%
+
+
+• As a person incharge of making business decisions, what else are you learning from the results you are seeing from all these methods?
+* Logistic Regression model performed well in ROC curve but in the accuracy it performed        poorly.
+* Most models performed well when all the columns were used in dataset except the outcome as    predictor,hence for the business to thriev well in future all the factors(columns in the      dataset) should be included.
+* Considering the ROC as measure of metrics,this is how the models averaly performed
+
+## Mean
+```{r}
+mean(tib$accuracy.Model)
+```
+
+  Had a mean Of  0.838875.The performed really well.
+  
+  
+* When the models were used to make future plans,they had 63 % of being correct.
+```{r}
+mean(table_2$accuracy_2)
+```
+
+
+
+
+
+8. Business Analysis and Recommendations
+Pretend that the training dataset reflects the past and that the test data set captures the customers we are concerned about currently. Use your logistic regression model with your best threshold (identified in part 2) to answer the following questions:
+• In terms of relative importance how would you rate the predictors in your model. As a business manager, which factors would you focus on (for example you could invest in offering some incentives or promotions) to decrease the chances of customers leaving?
+
+## Wald test
+```{r}
+# Calculate the Wald test statistics and p-values
+wald.test <- summary(LogisticModel.train)$coefficients[, "Pr(>|z|)"]
+wald.test
+```
+*OBSERVATION:*
+This output shows the Wald test statistics and p-values for each predictor variable in the GLM model. The higher the Wald statistic, the more important the variable is in predicting the response.Hence this are the most important variables;
+ * PhoneServiceYes 
+ * PaymentMethodElectronic check 
+ * GenderMale 
+
+As a business manager, this factor i will focus on;
+* Improving the phone services we offer to our customers,such making an app of our business     where the customers can order our services online.
+* Improve on customer's payment method electronically,by ensuring it is fast and reliable.
+* Give directives to the marketing department to encourage both genders(male and females) to    buy our products.
+
+
+
+
+• Collect all the customers from the test dataset that your model says are going to leave. What is the predicted loss in revenue per month if all these customers leave? This reflects the loss if Current action is taken.
+## Confusion matrix
+```{r}
+table_3
+```
+
+
+## Percentage of customer who would leave
+```{r}
+(161/(161 + 109 + 185 + 944)) * 100
+```
+
+*OBSERVATION:*
+Using predictions made by logistic regression,12 % of the customers will leave.Which approximaly lead to 12 % loss of revenue per month.
+
+
+
+
+
+• Propose an incentive scheme to your manager that can help reduce the loss in revenue by retaining some (or all) customers. Provide justification by evaluating costs and benefits of your incentive scheme.Costs will be the dollar amount in incentives given (for example). Benefits will be the revenues from these customers if they stay with your company. Compute the net benefits from your incentive scheme.
+Make a case in your report to your upper management for implementing your scheme.
+
+
+*Propose an incentive scheme*
+
+
+
+A loyalty program is one incentive plan that might be able to help stop income loss by keeping customers. Customers who make repeated purchases could receive rewards from the loyalty program, such as savings on subsequent purchases, first access to new goods, or complimentary gifts.
+
+The expenses associated with putting this program into action would cover both the up-front costs associated with developing the program and designing the rewards as well as continuing expenses related to managing the program and delivering rewards. Depending on the program's complexity and the size of the customer base, these expenses may be substantial.
+
+The rewards of the loyalty scheme could, however, be significant. The business could boost customer loyalty by providing rewards for patrons who stick around and make additional transactions.
+
+
+
+For example, let us say that the cost of the project is $6000 per month and that the revenue generated from retained customers is $120000 per month. In this case, the net benefit of the program would be $6000 ($120000 - $6000).
+
